@@ -1,0 +1,4 @@
+numpy
+openai-whisper
+ollama
+ffmpeg-python
