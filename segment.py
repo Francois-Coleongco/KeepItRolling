@@ -9,5 +9,5 @@ class Segment:
         start = np.round(start).astype(int)
         self.video_len = vid_end;
         self.text = text
-        self.start = start if start - self.padding >= 0 else 0
+        self.start = start if start - self.padding >= 0 else np.float64(0)
         self.end = np.round(end).astype(int) + self.padding # might needa check upper bound

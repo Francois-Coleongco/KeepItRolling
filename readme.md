@@ -10,5 +10,6 @@ coherence check will be done by ollama local LLM.
 
 dependencies
 
-    sudo apt-get install ffmpeg
+sudo apt-get install ffmpeg
 curl -fsSL https://ollama.com/install.sh | sh
+pip install git+https://github.com/snakers4/silero-models
