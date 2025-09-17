@@ -3,12 +3,13 @@ from segment import Segment
 import ollama
 import torch
 import torch
-
-model, example_texts, languages, punct, apply_te = torch.hub.load(repo_or_dir='snakers4/silero-models',
-                                                                  model='silero_te', languages="en")
+from silero import silero_te
 
 def repunctuate(dat: str):
-    print("this is the repunctuated?", apply_te(dat, lan='en'))
+    dat = dat.lower()
+    model, examples, langs, supported_punct, apply_te = silero_te()
+    punctuated_text = apply_te(dat, model)
+    return punctuated_text
 
 
 def ollama_passthrough(dat: str):
@@ -22,7 +23,7 @@ def ollama_passthrough(dat: str):
 
     Decide if the text is coherent and conveys a meaningful idea.
     - Do NOT penalize run-on sentences.
-    - Do NOT mark it incoherent just because of spelling errors or unknown words.
+    - Do NOT mark it incoherent just because of spelling errors or unknown words which are marked with [UNK].
     - Only return "true" if the text overall makes sense as human speech or explanation.
     - Return "false" only if the text is pure nonsense or word salad.
 
