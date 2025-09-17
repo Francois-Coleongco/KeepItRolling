@@ -21,9 +21,8 @@ def ollama_passthrough(dat: str):
     resp = ollama.generate('llama3.2', f"""
     You are analyzing a transcript segment from a video.
 
-    Decide if the text is coherent and conveys a meaningful idea.
-    - Do NOT penalize run-on sentences.
-    - Do NOT mark it incoherent just because of spelling errors or unknown words which are marked with [UNK].
+    Decide if the text is coherent.
+    - Do NOT mark it incoherent just because of spelling errors or unknown words.
     - Only return "true" if the text overall makes sense as human speech or explanation.
     - Return "false" only if the text is pure nonsense or word salad.
 
@@ -37,54 +36,40 @@ def ollama_passthrough(dat: str):
     return "true" in resp['response']
 
 
-def process_segments(segments: list[Segment]):
+def process_segments(segments: list[Segment]) -> list[Segment]:
     length = len(segments)
     # should change the return type to list perhaps if not doing the splitting logic in here
 
-    ret = []
+    ret: list[Segment]= []
 
     # get the contiguous (by threshold) segments and group them into a new list that is ret
     # use a sliding window
 
     threshold = np.float64(2) # should be something user defined in a config and/or part of flags
 
-    i = 1
-    j = 1
+    i = 0
 
-    new_start = segments[0].start
-    new_end = segments[0].end
+    if length == 1:
+        if ollama_passthrough(segments[0].text):
+            ret.append(Segment(segments[0].start, segments[0].end,
+                              np.float64(10000.0), segments[0].text))
+        return ret
 
-    contiguous = segments[0].text
-    print("initialized contiguous was", contiguous)
-    ended_in_mid = 0
+    for j in range(1, length):
+        curr_gap = segments[j].start - segments[j - 1].end
 
-    while j < length:
-        print(f"looping, end of last: {segments[j - 1].end} start of next: {segments[j].start} with text: {contiguous}")
-        if not (segments[j].start - segments[j - 1].end <= threshold):
-            print("made it in here?")
-            new_end = segments[j - 1].end
-
-            contiguous = "".join(s.text for s in segments[i:j + 1])
+        if curr_gap > threshold:
+            contiguous = "".join(s.text for s in segments[i:j])
+            if ollama_passthrough(contiguous):
+                Segment(segments[i].start, segments[j - 1].end, np.float64(10000), contiguous)
 
             i = j
 
-            if ollama_passthrough(contiguous):
-                print(f"appending segment containing: \"{contiguous}\" between {new_start} and {new_end}.")
-                ret.append(Segment(new_start, new_end, np.float64(10000.0), contiguous))
+    contiguous_text = "".join(seg.text for seg in segments[i:length])
 
-            new_start = segments[j].start
-
-            contiguous = ""
-        else:
-            ended_in_mid = 1
-
-        j += 1
-
-    if ended_in_mid:
-        contiguous = contiguous + "".join(s.text for s in segments[i:j + 1])
-        if ollama_passthrough(contiguous): # not empty
-            print(f"attempting to add last chunk, {contiguous}")
-            ret.append(Segment(new_start, new_end, np.float64(10000.0), contiguous))
+    if ollama_passthrough(contiguous_text):
+        ret.append(Segment(segments[i].start, segments[length-1].end,
+                      np.float64(10000.0), contiguous_text))
 
 
     return ret

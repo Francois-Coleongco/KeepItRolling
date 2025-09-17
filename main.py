@@ -18,7 +18,10 @@ def main():
     if segments == None:
         raise ValueError("no audio segments found in video!")
 
-    print(context.process_segments(segments))
+    makes_sense = context.process_segments(segments)
+
+    for seg in makes_sense:
+        print(seg.start, seg.end)
 
 if __name__ == "__main__":
     main()
