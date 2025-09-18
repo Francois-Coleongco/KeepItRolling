@@ -6,6 +6,7 @@ based on the locations where there is speech, single out the contiguous sections
 
 coherence check will be done by ollama local LLM.
 
+after coherence check, you can label the video chunk with a short description of what it's about as well as the `tag`
 
 
 dependencies

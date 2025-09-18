@@ -2,6 +2,7 @@ import pre
 import audio
 import argparse
 import context
+import slicey
 
 def main():
 
@@ -20,8 +21,13 @@ def main():
 
     makes_sense = context.process_segments(segments)
 
+    print(f"this is makes sense: {makes_sense}")
+
+    tag = 0
     for seg in makes_sense:
         print(seg.start, seg.end)
+        slicey.split_and_write_vid(args.video, str(seg.start), str(seg.end), tag)
+        tag += 1
 
 if __name__ == "__main__":
     main()

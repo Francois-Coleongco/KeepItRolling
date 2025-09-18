@@ -19,21 +19,25 @@ def ollama_passthrough(dat: str):
         raise ValueError("passed in empty string to ollama_passthrough")
 
     resp = ollama.generate('llama3.2', f"""
-    You are analyzing a transcript segment from a video.
+    You are a coarse filter for human speech. Your only task is to flag text that is completely and utterly unintelligible.
 
-    Decide if the text is coherent.
-    - Do NOT mark it incoherent just because of spelling errors or unknown words.
-    - Only return "true" if the text overall makes sense as human speech or explanation.
-    - Return "false" only if the text is pure nonsense or word salad.
+    Return "false" **only** if the text is pure gibberish with no trace of coherent human language (e.g., "asdf jkl; qwerty", "the cat blue inherently"). This is for random word salad, not for bad or awkward writing.
 
-    Reply with ONLY "true" or "false".
+    Return "true" for **everything else**. This includes:
+    - Text with poor grammar, bad spelling, or weird punctuation.
+    - Text with "um", "uh", or hesitations.
+    - Text that is a single word or a fragment.
+    - Technical jargon, even if used incorrectly.
+    - Strange or illogical statements that a human might still say.
+    - Repetitive or boring statements.
 
+    If a reasonable human could utter the text in any context, return "true".
     Text: "{dat}"
     """)
 
     print(resp['response'])
 
-    return "true" in resp['response']
+    return "true" in resp['response'].lower()
 
 
 def process_segments(segments: list[Segment]) -> list[Segment]:
@@ -61,7 +65,7 @@ def process_segments(segments: list[Segment]) -> list[Segment]:
         if curr_gap > threshold:
             contiguous = "".join(s.text for s in segments[i:j])
             if ollama_passthrough(contiguous):
-                Segment(segments[i].start, segments[j - 1].end, np.float64(10000), contiguous)
+                ret.append(Segment(segments[i].start, segments[j - 1].end, np.float64(10000), contiguous))
 
             i = j
 
