@@ -29,7 +29,7 @@ You can already run the logic modules directly, but the REST API is still being 
 
 ## Planned API
 
-### `POST /upload (planned)
+### POST /upload (planned)
 Process a video or audio file.
 
 **Expected request:**
