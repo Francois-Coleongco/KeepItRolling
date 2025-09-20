@@ -13,14 +13,14 @@ The **core model logic is implemented and working**, while the **FastAPI service
 - Splits video/audio into segments where speech is detected.  
 - Checks coherence of speech segments using a local LLM (Ollama).  
 - Tags / labels each segment with short descriptions.  
-- Uses OpenAI Whisper (locally) and Silero-models for speech detection.  
-- Designed to be exposed as an API with **FastAPI** (in progress).  
+- Uses OpenAI Whisper for speech extraction, Silero-models for repunctuation before feeding into coherence check.
+- Designed to be exposed as an API with **FastAPI** (in progress).
 
 ---
 
 ## Current Status
 
-✅ Core model logic (speech detection, coherence checks, tagging)  
+✅ Core model logic (speech detection, coherence checks, tagging)
 🚧 FastAPI service layer (endpoints, request/response handling)  
 
 You can already run the logic modules directly, but the REST API is still being integrated.
@@ -38,10 +38,10 @@ Process a video or audio file.
 
 **Expected response:**
 - JSON containing:
-  - Segment timestamps  
+  - Segment timestamps
   - Transcriptions  
-  - Coherence check results  
-  - Tags/labels  
+  - Coherence check results
+  - Tags/labels
 
 ---
 
