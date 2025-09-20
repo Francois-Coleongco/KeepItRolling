@@ -8,20 +8,6 @@ The **core model logic is implemented and working**, while the **FastAPI service
 
 ---
 
-## Table of Contents
-
-- [Features](#features)  
-- [Current Status](#current-status)  
-- [Planned API](#planned-api)  
-- [Usage](#usage)  
-- [Project Structure](#project-structure)  
-- [Testing](#testing)  
-- [Contributing](#contributing)  
-- [License](#license)  
-- [Acknowledgements](#acknowledgements)
-
----
-
 ## Features
 
 - Splits video/audio into segments where speech is detected.  
