@@ -21,6 +21,7 @@ The **core model logic is implemented and working**, while the **FastAPI service
 ## Current Status
 
 ✅ Core model logic (speech detection, coherence checks, tagging)
+
 🚧 FastAPI service layer (endpoints, request/response handling)  
 
 You can already run the logic modules directly, but the REST API is still being integrated.
