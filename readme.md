@@ -14,3 +14,6 @@ dependencies
 sudo apt-get install ffmpeg
 curl -fsSL https://ollama.com/install.sh | sh
 pip install git+https://github.com/snakers4/silero-models
+
+
+also u probably wanna put a disclaimer about privacy/security cuz u might code sometjhing rlly stupid and then they get their data leaked and that would be sad, so warn ppl that it might happen cuz ur not the greatest programmer of all time yayayayayaya
