@@ -8,26 +8,33 @@ def main():
 
     parser = argparse.ArgumentParser("")
     parser.add_argument("-v", "--video", type=str, help="please enter a valid video path e.g. ./vid.mp4")
-    parser.add_argument("-p", "--padding", type=int, help="enter padding in seconds between clips")
-    args = parser.parse_args()
+    parser.add_argument("-p", "--padding", type=int, default=1, help="enter padding in seconds between clips")
 
-    audio_path=f"{args.video}_tmp_.wav"
+    try:
+        args = parser.parse_args()
 
-    pre.extract_audio_from_vid(args.video, audio_path)
-    segments = audio.transcribe_audio(audio_path, args.padding)
+        audio_path=f"{args.video}_tmp_.wav"
 
-    if segments == None:
-        raise ValueError("no audio segments found in video!")
+        pre.extract_audio_from_vid(args.video, audio_path)
+        segments = audio.transcribe_audio(audio_path, args.padding)
 
-    makes_sense = context.process_segments(segments)
+        if segments == None:
+            raise ValueError("no audio segments found in video!")
 
-    print(f"this is makes sense: {makes_sense}")
+        makes_sense = context.process_segments(segments)
 
-    tag = 0
-    for seg in makes_sense:
-        print(seg.start, seg.end)
-        slicey.split_and_write_vid(args.video, str(seg.start), str(seg.end), tag)
-        tag += 1
+        print(f"this is makes sense: {makes_sense}")
+
+        tag = 0
+        for seg in makes_sense:
+            print(seg.start, seg.end)
+            slicey.split_and_write_vid(args.video, str(seg.start), str(seg.end), tag)
+            tag += 1
+
+    except Exception as e:
+        print("exception parsing args was:", e, "\nplease enter command in the form `python3 ./main.py --video media.mp4 --padding 1`")
+
+
 
 if __name__ == "__main__":
     main()

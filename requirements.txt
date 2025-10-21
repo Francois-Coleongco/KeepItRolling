@@ -1,4 +1,6 @@
 numpy
 openai-whisper
 ollama
+silero
 ffmpeg-python
+fastapi[standard]
