@@ -30,19 +30,21 @@ You can already run the logic modules directly, but the REST API is still being 
 
 ---
 
-## Planned API
+## FastAPI
 
-### POST /upload (planned)
+### POST /split-vid
 Process a video or audio file.
 
 **Expected request:**
-- Multipart/form-data with file upload (audio/video).
+- Multipart/form-data with video file upload.
 - Optional query parameters for configuration.
 
 **Expected response:**
 - JSON containing:
   - Segment timestamps
   - Transcriptions  
+
+  **Planned:**
   - Coherence check results
   - Tags/labels
 
@@ -50,8 +52,17 @@ Process a video or audio file.
 
 ## Usage
 
-Right now, you can run the main.py file in the vietual environment directly to process audio/video.
+Right now, you can use the API through SwaggerUI, React frontend is in progress.
 
+```
 
+python3 -m venv venv
+source ./venv/bin/activate
+pip3 install -r requirements.txt
+cd api/
 
-But in the future, will be accessible via this link --> future me, pls put something here-
+fastapi dev main.py
+
+```
+
+You can now upload at 127.0.0.1:800/docs
