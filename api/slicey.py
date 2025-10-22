@@ -2,7 +2,8 @@ import ffmpeg
 
 def split_and_write_vid(vid_path: str, start: str, stop: str, tag: int) -> str:
     s = vid_path.rsplit('.', 1) # split once near the end
-    outfile = "Videos/" + s[-2] + f"_EDIT_{tag}." + s[-1] 
+
+    outfile = "OUTPUTS/" + s[-2].replace("UPLOADS/", "", 1) + f"_EDIT_{tag}." + s[-1]
 
     print(f"attempting to split into outfile: {outfile}")
 

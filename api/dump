@@ -1,0 +1,871 @@
+from typing import Optional
+import numpy as np
+import whisper
+from segment import Segment
+
+def transcribe_audio(audio_path: str, padding: int) -> Optional[list[Segment]]:
+    try:
+        model = whisper.load_model("medium.en") # change this to a multilingual one for cross language support in the future, for now just english for development
+        result = model.transcribe(
+            audio_path,
+            word_timestamps=True,
+            verbose=True,
+            fp16=False,
+            temperature=0.0,
+            best_of=5,
+            condition_on_previous_text=False
+        )
+
+        Segment.padding = padding
+
+        segments: list[Segment] = []
+
+        key = 0
+
+        for segment in result['segments']:
+            s: Segment = Segment(segment['start'], segment['end'], np.float64(10000.0), segment['text'])
+            segments.append(s)
+            key += 1
+
+
+
+        print("Transcription: ", result)
+        return segments
+
+    except Exception as e:
+        print("error transcribing: ", e)
+        return None
+
+
+import numpy as np
+from segment import Segment
+import ollama
+import torch
+import torch
+from silero import silero_te
+
+def repunctuate(dat: str):
+    dat = dat.lower()
+    model, examples, langs, supported_punct, apply_te = silero_te()
+    punctuated_text = apply_te(dat, model)
+    return punctuated_text
+
+
+def ollama_passthrough(dat: str):
+    dat = repunctuate(dat)
+    print("dat was", dat)
+    if dat == "":
+        raise ValueError("passed in empty string to ollama_passthrough")
+
+    resp = ollama.generate('llama3.2', f"""
+    You are a coarse filter for human speech. Your only task is to flag text that is completely and utterly unintelligible.
+
+    Return "false" **only** if the text is pure gibberish with no trace of coherent human language (e.g., "asdf jkl; qwerty", "the cat blue inherently"). This is for random word salad, not for bad or awkward writing.
+
+    Return "true" for **everything else**. This includes:
+    - Text with poor grammar, bad spelling, or weird punctuation.
+    - Text with "um", "uh", or hesitations.
+    - Text that is a single word or a fragment.
+    - Technical jargon, even if used incorrectly.
+    - Strange or illogical statements that a human might still say.
+    - Repetitive or boring statements.
+
+    If a reasonable human could utter the text in any context, return "true".
+    Text: "{dat}"
+    """)
+
+    print(resp['response'])
+
+    return "true" in resp['response'].lower()
+
+
+def process_segments(segments: list[Segment]) -> list[Segment]:
+    length = len(segments)
+    # should change the return type to list perhaps if not doing the splitting logic in here
+
+    ret: list[Segment]= []
+
+    # get the contiguous (by threshold) segments and group them into a new list that is ret
+    # use a sliding window
+
+    threshold = np.float64(2) # should be something user defined in a config and/or part of flags
+
+    i = 0
+
+    if length == 1:
+        if ollama_passthrough(segments[0].text):
+            ret.append(Segment(segments[0].start, segments[0].end,
+                              np.float64(10000.0), segments[0].text))
+        return ret
+
+    for j in range(1, length):
+        curr_gap = segments[j].start - segments[j - 1].end
+
+        if curr_gap > threshold:
+            contiguous = "".join(s.text for s in segments[i:j])
+            if ollama_passthrough(contiguous):
+                ret.append(Segment(segments[i].start, segments[j - 1].end, np.float64(10000), contiguous))
+
+            i = j
+
+    contiguous_text = "".join(seg.text for seg in segments[i:length])
+
+    if ollama_passthrough(contiguous_text):
+        ret.append(Segment(segments[i].start, segments[length-1].end,
+                      np.float64(10000.0), contiguous_text))
+
+
+    return ret
+# pre-trained STT models
+stt_models:
+  en:
+    latest:
+      meta:
+        name: "en_v6"
+        sample: "https://models.silero.ai/examples/en_sample.wav"
+      labels: "https://models.silero.ai/models/en/en_v1_labels.json"
+      jit: "https://models.silero.ai/models/en/en_v6.jit"
+      onnx: "https://models.silero.ai/models/en/en_v5.onnx"
+      jit_q: "https://models.silero.ai/models/en/en_v6_q.jit"
+      jit_xlarge: "https://models.silero.ai/models/en/en_v6_xlarge.jit"
+      onnx_xlarge: "https://models.silero.ai/models/en/en_v6_xlarge.onnx"
+    v6:
+      meta:
+        name: "en_v6"
+        sample: "https://models.silero.ai/examples/en_sample.wav"
+      labels: "https://models.silero.ai/models/en/en_v1_labels.json"
+      jit: "https://models.silero.ai/models/en/en_v6.jit"
+      onnx: "https://models.silero.ai/models/en/en_v5.onnx"
+      jit_q: "https://models.silero.ai/models/en/en_v6_q.jit"
+      jit_xlarge: "https://models.silero.ai/models/en/en_v6_xlarge.jit"
+      onnx_xlarge: "https://models.silero.ai/models/en/en_v6_xlarge.onnx"
+    v5:
+      meta:
+        name: "en_v5"
+        sample: "https://models.silero.ai/examples/en_sample.wav"
+      labels: "https://models.silero.ai/models/en/en_v1_labels.json"
+      jit: "https://models.silero.ai/models/en/en_v5.jit"
+      onnx: "https://models.silero.ai/models/en/en_v5.onnx"
+      onnx_q: "https://models.silero.ai/models/en/en_v5_q.onnx"
+      jit_q: "https://models.silero.ai/models/en/en_v5_q.jit"
+      jit_xlarge: "https://models.silero.ai/models/en/en_v5_xlarge.jit"
+      onnx_xlarge: "https://models.silero.ai/models/en/en_v5_xlarge.onnx"
+    v4_0:
+      meta:
+        name: "en_v4_0"
+        sample: "https://models.silero.ai/examples/en_sample.wav"
+      labels: "https://models.silero.ai/models/en/en_v1_labels.json"
+      jit_large: "https://models.silero.ai/models/en/en_v4_0_jit_large.model"
+      onnx_large: "https://models.silero.ai/models/en/en_v4_0_large.onnx"
+    v3:
+      meta:
+        name: "en_v3"
+        sample: "https://models.silero.ai/examples/en_sample.wav"
+      labels: "https://models.silero.ai/models/en/en_v1_labels.json"
+      jit: "https://models.silero.ai/models/en/en_v3_jit.model"
+      onnx: "https://models.silero.ai/models/en/en_v3.onnx"
+      jit_q: "https://models.silero.ai/models/en/en_v3_jit_q.model"
+      jit_skip: "https://models.silero.ai/models/en/en_v3_jit_skips.model"
+      jit_large: "https://models.silero.ai/models/en/en_v3_jit_large.model"
+      onnx_large: "https://models.silero.ai/models/en/en_v3_large.onnx"
+      jit_xsmall: "https://models.silero.ai/models/en/en_v3_jit_xsmall.model"
+      jit_q_xsmall: "https://models.silero.ai/models/en/en_v3_jit_q_xsmall.model"
+      onnx_xsmall: "https://models.silero.ai/models/en/en_v3_xsmall.onnx"
+    v2:
+      meta:
+        name: "en_v2"
+        sample: "https://models.silero.ai/examples/en_sample.wav"
+      labels: "https://models.silero.ai/models/en/en_v1_labels.json"
+      jit: "https://models.silero.ai/models/en/en_v2_jit.model"
+      onnx: "https://models.silero.ai/models/en/en_v2.onnx"
+      tf: "https://models.silero.ai/models/en/en_v2_tf.tar.gz"
+    v1:
+      meta:
+        name: "en_v1"
+        sample: "https://models.silero.ai/examples/en_sample.wav"
+      labels: "https://models.silero.ai/models/en/en_v1_labels.json"
+      jit: "https://models.silero.ai/models/en/en_v1_jit.model"
+      onnx: "https://models.silero.ai/models/en/en_v1.onnx"
+      tf: "https://models.silero.ai/models/en/en_v1_tf.tar.gz"
+  de:
+    latest:
+      meta:
+        name: "de_v1"
+        sample: "https://models.silero.ai/examples/de_sample.wav"
+      labels: "https://models.silero.ai/models/de/de_v1_labels.json"
+      jit: "https://models.silero.ai/models/de/de_v1_jit.model"
+      onnx: "https://models.silero.ai/models/de/de_v1.onnx"
+      tf: "https://models.silero.ai/models/de/de_v1_tf.tar.gz"
+    v1:
+      meta:
+        name: "de_v1"
+        sample: "https://models.silero.ai/examples/de_sample.wav"
+      labels: "https://models.silero.ai/models/de/de_v1_labels.json"
+      jit_large: "https://models.silero.ai/models/de/de_v1_jit.model"
+      onnx: "https://models.silero.ai/models/de/de_v1.onnx"
+      tf: "https://models.silero.ai/models/de/de_v1_tf.tar.gz"
+    v3:
+      meta:
+        name: "de_v3"
+        sample: "https://models.silero.ai/examples/de_sample.wav"
+      labels: "https://models.silero.ai/models/de/de_v1_labels.json"
+      jit_large: "https://models.silero.ai/models/de/de_v3_large.jit"
+    v4:
+      meta:
+        name: "de_v4"
+        sample: "https://models.silero.ai/examples/de_sample.wav"
+      labels: "https://models.silero.ai/models/de/de_v1_labels.json"
+      jit_large: "https://models.silero.ai/models/de/de_v4_large.jit"
+      onnx_large: "https://models.silero.ai/models/de/de_v4_large.onnx"
+  es:
+    latest:
+      meta:
+        name: "es_v1"
+        sample: "https://models.silero.ai/examples/es_sample.wav"
+      labels: "https://models.silero.ai/models/es/es_v1_labels.json"
+      jit: "https://models.silero.ai/models/es/es_v1_jit.model"
+      onnx: "https://models.silero.ai/models/es/es_v1.onnx"
+      tf: "https://models.silero.ai/models/es/es_v1_tf.tar.gz"
+  ua:
+    latest:
+      meta:
+        name: "ua_v3"
+        sample: "https://models.silero.ai/examples/ua_sample.wav"
+        credits:
+          datasets:
+            speech-recognition-uk: https://github.com/egorsmkv/speech-recognition-uk
+      labels: "https://models.silero.ai/models/ua/ua_v1_labels.json"
+      jit: "https://models.silero.ai/models/ua/ua_v3_jit.model"
+      jit_q: "https://models.silero.ai/models/ua/ua_v3_jit_q.model"
+      onnx: "https://models.silero.ai/models/ua/ua_v3.onnx"
+    v3:
+      meta:
+        name: "ua_v3"
+        sample: "https://models.silero.ai/examples/ua_sample.wav"
+        credits:
+          datasets:
+            speech-recognition-uk: https://github.com/egorsmkv/speech-recognition-uk
+      labels: "https://models.silero.ai/models/ua/ua_v1_labels.json"
+      jit: "https://models.silero.ai/models/ua/ua_v3_jit.model"
+      jit_q: "https://models.silero.ai/models/ua/ua_v3_jit_q.model"
+      onnx: "https://models.silero.ai/models/ua/ua_v3.onnx"
+    v1:
+      meta:
+        name: "ua_v1"
+        sample: "https://models.silero.ai/examples/ua_sample.wav"
+        credits:
+          datasets:
+            speech-recognition-uk: https://github.com/egorsmkv/speech-recognition-uk
+      labels: "https://models.silero.ai/models/ua/ua_v1_labels.json"
+      jit: "https://models.silero.ai/models/ua/ua_v1_jit.model"
+      jit_q: "https://models.silero.ai/models/ua/ua_v1_jit_q.model"
+tts_models:
+  ru:
+    v4_ru:
+      latest:
+        example: 'В н+едрах т+ундры в+ыдры в г+етрах т+ырят в в+ёдра +ядра к+едров.'
+        package: 'https://models.silero.ai/models/tts/ru/v4_ru.pt'
+        sample_rate: [8000, 24000, 48000]
+    v3_1_ru:
+      latest:
+        example: 'В н+едрах т+ундры в+ыдры в г+етрах т+ырят в в+ёдра +ядра к+едров.'
+        package: 'https://models.silero.ai/models/tts/ru/v3_1_ru.pt'
+        sample_rate: [8000, 24000, 48000]
+    ru_v3:
+      latest:
+        example: 'В н+едрах т+ундры в+ыдры в г+етрах т+ырят в в+ёдра +ядра к+едров.'
+        package: 'https://models.silero.ai/models/tts/ru/ru_v3.pt'
+        sample_rate: [8000, 24000, 48000]
+    aidar_v2:
+      latest:
+        example: 'В н+едрах т+ундры в+ыдры в г+етрах т+ырят в в+ёдра +ядра к+едров.'
+        package: 'https://models.silero.ai/models/tts/ru/v2_aidar.pt'
+        sample_rate: [8000, 16000]
+    aidar_8khz:
+      latest:
+        tokenset: '_~абвгдеёжзийклмнопрстуфхцчшщъыьэюя +.,!?…:;–'
+        example: 'В н+едрах т+ундры в+ыдры в г+етрах т+ырят в в+ёдра +ядра к+едров.'
+        jit: 'https://models.silero.ai/models/tts/ru/v1_aidar_8000.jit'
+        sample_rate: 8000
+      v1:
+        tokenset: '_~абвгдеёжзийклмнопрстуфхцчшщъыьэюя +.,!?…:;–'
+        example: 'В н+едрах т+ундры в+ыдры в г+етрах т+ырят в в+ёдра +ядра к+едров.'
+        jit: 'https://models.silero.ai/models/tts/ru/v1_aidar_8000.jit'
+        sample_rate: 8000
+    aidar_16khz:
+      latest:
+        tokenset: '_~абвгдеёжзийклмнопрстуфхцчшщъыьэюя +.,!?…:;–'
+        example: 'В н+едрах т+ундры в+ыдры в г+етрах т+ырят в в+ёдра +ядра к+едров.'
+        jit: 'https://models.silero.ai/models/tts/ru/v1_aidar_16000.jit'
+        sample_rate: 16000
+      v1:
+        tokenset: '_~абвгдеёжзийклмнопрстуфхцчшщъыьэюя +.,!?…:;–'
+        example: 'В н+едрах т+ундры в+ыдры в г+етрах т+ырят в в+ёдра +ядра к+едров.'
+        jit: 'https://models.silero.ai/models/tts/ru/v1_aidar_16000.jit'
+        sample_rate: 16000
+    baya_v2:
+      latest:
+        example: 'В н+едрах т+ундры в+ыдры в г+етрах т+ырят в в+ёдра +ядра к+едров.'
+        package: 'https://models.silero.ai/models/tts/ru/v2_baya.pt'
+        sample_rate: [8000, 16000]
+    baya_8khz:
+      latest:
+        tokenset: '_~абвгдеёжзийклмнопрстуфхцчшщъыьэюя +.,!?…:;–'
+        example: 'В н+едрах т+ундры в+ыдры в г+етрах т+ырят в в+ёдра +ядра к+едров.'
+        jit: 'https://models.silero.ai/models/tts/ru/v1_baya_8000.jit'
+        sample_rate: 8000
+      v1:
+        tokenset: '_~абвгдеёжзийклмнопрстуфхцчшщъыьэюя +.,!?…:;–'
+        example: 'В н+едрах т+ундры в+ыдры в г+етрах т+ырят в в+ёдра +ядра к+едров.'
+        jit: 'https://models.silero.ai/models/tts/ru/v1_baya_8000.jit'
+        sample_rate: 8000
+    baya_16khz:
+      latest:
+        tokenset: '_~абвгдеёжзийклмнопрстуфхцчшщъыьэюя +.,!?…:;–'
+        example: 'В н+едрах т+ундры в+ыдры в г+етрах т+ырят в в+ёдра +ядра к+едров.'
+        jit: 'https://models.silero.ai/models/tts/ru/v1_baya_16000.jit'
+        sample_rate: 16000
+      v1:
+        tokenset: '_~абвгдеёжзийклмнопрстуфхцчшщъыьэюя +.,!?…:;–'
+        example: 'В н+едрах т+ундры в+ыдры в г+етрах т+ырят в в+ёдра +ядра к+едров.'
+        jit: 'https://models.silero.ai/models/tts/ru/v1_baya_16000.jit'
+        sample_rate: 16000
+    irina_v2:
+      latest:
+        example: 'В н+едрах т+ундры в+ыдры в г+етрах т+ырят в в+ёдра +ядра к+едров.'
+        package: 'https://models.silero.ai/models/tts/ru/v2_irina.pt'
+        sample_rate: [8000, 16000]
+    irina_8khz:
+      latest:
+        tokenset: '_~абвгдеёжзийклмнопрстуфхцчшщъыьэюя +.,!?…:;–'
+        example: 'В н+едрах т+ундры в+ыдры в г+етрах т+ырят в в+ёдра +ядра к+едров.'
+        jit: 'https://models.silero.ai/models/tts/ru/v1_irina_8000.jit'
+        sample_rate: 8000
+      v1:
+        tokenset: '_~абвгдеёжзийклмнопрстуфхцчшщъыьэюя +.,!?…:;–'
+        example: 'В н+едрах т+ундры в+ыдры в г+етрах т+ырят в в+ёдра +ядра к+едров.'
+        jit: 'https://models.silero.ai/models/tts/ru/v1_irina_8000.jit'
+        sample_rate: 8000
+    irina_16khz:
+      latest:
+        tokenset: '_~абвгдеёжзийклмнопрстуфхцчшщъыьэюя +.,!?…:;–'
+        example: 'В н+едрах т+ундры в+ыдры в г+етрах т+ырят в в+ёдра +ядра к+едров.'
+        jit: 'https://models.silero.ai/models/tts/ru/v1_irina_16000.jit'
+        sample_rate: 16000
+      v1:
+        tokenset: '_~абвгдеёжзийклмнопрстуфхцчшщъыьэюя +.,!?…:;–'
+        example: 'В н+едрах т+ундры в+ыдры в г+етрах т+ырят в в+ёдра +ядра к+едров.'
+        jit: 'https://models.silero.ai/models/tts/ru/v1_irina_16000.jit'
+        sample_rate: 16000
+    kseniya_v2:
+      latest:
+        example: 'В н+едрах т+ундры в+ыдры в г+етрах т+ырят в в+ёдра +ядра к+едров.'
+        package: 'https://models.silero.ai/models/tts/ru/v2_kseniya.pt'
+        sample_rate: [8000, 16000]
+    kseniya_8khz:
+      latest:
+        tokenset: '_~абвгдеёжзийклмнопрстуфхцчшщъыьэюя +.,!?…:;–'
+        example: 'В н+едрах т+ундры в+ыдры в г+етрах т+ырят в в+ёдра +ядра к+едров.'
+        jit: 'https://models.silero.ai/models/tts/ru/v1_kseniya_8000.jit'
+        sample_rate: 8000
+      v1:
+        tokenset: '_~абвгдеёжзийклмнопрстуфхцчшщъыьэюя +.,!?…:;–'
+        example: 'В н+едрах т+ундры в+ыдры в г+етрах т+ырят в в+ёдра +ядра к+едров.'
+        jit: 'https://models.silero.ai/models/tts/ru/v1_kseniya_8000.jit'
+        sample_rate: 8000
+    kseniya_16khz:
+      latest:
+        tokenset: '_~абвгдеёжзийклмнопрстуфхцчшщъыьэюя +.,!?…:;–'
+        example: 'В н+едрах т+ундры в+ыдры в г+етрах т+ырят в в+ёдра +ядра к+едров.'
+        jit: 'https://models.silero.ai/models/tts/ru/v1_kseniya_16000.jit'
+        sample_rate: 16000
+      v1:
+        tokenset: '_~абвгдеёжзийклмнопрстуфхцчшщъыьэюя +.,!?…:;–'
+        example: 'В н+едрах т+ундры в+ыдры в г+етрах т+ырят в в+ёдра +ядра к+едров.'
+        jit: 'https://models.silero.ai/models/tts/ru/v1_kseniya_16000.jit'
+        sample_rate: 16000
+    natasha_v2:
+      latest:
+        example: 'В н+едрах т+ундры в+ыдры в г+етрах т+ырят в в+ёдра +ядра к+едров.'
+        package: 'https://models.silero.ai/models/tts/ru/v2_natasha.pt'
+        sample_rate: [8000, 16000]
+    natasha_8khz:
+      latest:
+        tokenset: '_~абвгдеёжзийклмнопрстуфхцчшщъыьэюя +.,!?…:;–'
+        example: 'В н+едрах т+ундры в+ыдры в г+етрах т+ырят в в+ёдра +ядра к+едров.'
+        jit: 'https://models.silero.ai/models/tts/ru/v1_natasha_8000.jit'
+        sample_rate: 8000
+      v1:
+        tokenset: '_~абвгдеёжзийклмнопрстуфхцчшщъыьэюя +.,!?…:;–'
+        example: 'В н+едрах т+ундры в+ыдры в г+етрах т+ырят в в+ёдра +ядра к+едров.'
+        jit: 'https://models.silero.ai/models/tts/ru/v1_natasha_8000.jit'
+        sample_rate: 8000
+    natasha_16khz:
+      latest:
+        tokenset: '_~абвгдеёжзийклмнопрстуфхцчшщъыьэюя +.,!?…:;–'
+        example: 'В н+едрах т+ундры в+ыдры в г+етрах т+ырят в в+ёдра +ядра к+едров.'
+        jit: 'https://models.silero.ai/models/tts/ru/v1_natasha_16000.jit'
+        sample_rate: 16000
+      v1:
+        tokenset: '_~абвгдеёжзийклмнопрстуфхцчшщъыьэюя +.,!?…:;–'
+        example: 'В н+едрах т+ундры в+ыдры в г+етрах т+ырят в в+ёдра +ядра к+едров.'
+        jit: 'https://models.silero.ai/models/tts/ru/v1_natasha_16000.jit'
+        sample_rate: 16000
+    ruslan_v2:
+      latest:
+        example: 'В н+едрах т+ундры в+ыдры в г+етрах т+ырят в в+ёдра +ядра к+едров.'
+        package: 'https://models.silero.ai/models/tts/ru/v2_ruslan.pt'
+        sample_rate: [8000, 16000]
+    ruslan_8khz:
+      latest:
+        tokenset: '_~абвгдеёжзийклмнопрстуфхцчшщъыьэюя +.,!?…:;–'
+        example: 'В н+едрах т+ундры в+ыдры в г+етрах т+ырят в в+ёдра +ядра к+едров.'
+        jit: 'https://models.silero.ai/models/tts/ru/v1_ruslan_8000.jit'
+        sample_rate: 8000
+      v1:
+        tokenset: '_~абвгдеёжзийклмнопрстуфхцчшщъыьэюя +.,!?…:;–'
+        example: 'В н+едрах т+ундры в+ыдры в г+етрах т+ырят в в+ёдра +ядра к+едров.'
+        jit: 'https://models.silero.ai/models/tts/ru/v1_ruslan_8000.jit'
+        sample_rate: 8000
+    ruslan_16khz:
+      latest:
+        tokenset: '_~абвгдеёжзийклмнопрстуфхцчшщъыьэюя +.,!?…:;–'
+        example: 'В н+едрах т+ундры в+ыдры в г+етрах т+ырят в в+ёдра +ядра к+едров.'
+        jit: 'https://models.silero.ai/models/tts/ru/v1_ruslan_16000.jit'
+        sample_rate: 16000
+      v1:
+        tokenset: '_~абвгдеёжзийклмнопрстуфхцчшщъыьэюя +.,!?…:;–'
+        example: 'В н+едрах т+ундры в+ыдры в г+етрах т+ырят в в+ёдра +ядра к+едров.'
+        jit: 'https://models.silero.ai/models/tts/ru/v1_ruslan_16000.jit'
+        sample_rate: 16000
+  en:
+    v3_en:
+      latest:
+        example: 'Can you can a canned can into an un-canned can like a canner can can a canned can into an un-canned can?'
+        package: 'https://models.silero.ai/models/tts/en/v3_en.pt'
+        sample_rate: [8000, 24000, 48000]
+    v3_en_indic:
+      latest:
+        example: 'Can you can a canned can into an un-canned can like a canner can can a canned can into an un-canned can?'
+        package: 'https://models.silero.ai/models/tts/en/v3_en_indic.pt'
+        sample_rate: [8000, 24000, 48000]
+    lj_v2:
+      latest:
+        example: 'Can you can a canned can into an un-canned can like a canner can can a canned can into an un-canned can?'
+        package: 'https://models.silero.ai/models/tts/en/v2_lj.pt'
+        sample_rate: [8000, 16000]
+    lj_8khz:
+      latest:
+        tokenset: '_~abcdefghijklmnopqrstuvwxyz .,!?…:;–'
+        example: 'Can you can a canned can into an un-canned can like a canner can can a canned can into an un-canned can?'
+        jit: 'https://models.silero.ai/models/tts/en/v1_lj_8000.jit'
+        sample_rate: 8000
+      v1:
+        tokenset: '_~abcdefghijklmnopqrstuvwxyz .,!?…:;–'
+        example: 'Can you can a canned can into an un-canned can like a canner can can a canned can into an un-canned can?'
+        jit: 'https://models.silero.ai/models/tts/en/v1_lj_8000.jit'
+        sample_rate: 8000
+    lj_16khz:
+      latest:
+        tokenset: '_~abcdefghijklmnopqrstuvwxyz .,!?…:;–'
+        example: 'Can you can a canned can into an un-canned can like a canner can can a canned can into an un-canned can?'
+        jit: 'https://models.silero.ai/models/tts/en/v1_lj_16000.jit'
+        sample_rate: 16000
+      v1:
+        tokenset: '_~abcdefghijklmnopqrstuvwxyz .,!?…:;–'
+        example: 'Can you can a canned can into an un-canned can like a canner can can a canned can into an un-canned can?'
+        jit: 'https://models.silero.ai/models/tts/en/v1_lj_16000.jit'
+        sample_rate: 16000
+  de:
+    v3_de:
+      latest:
+        example: 'Fischers Fritze fischt frische Fische, Frische Fische fischt Fischers Fritze.'
+        package: 'https://models.silero.ai/models/tts/de/v3_de.pt'
+        sample_rate: [8000, 24000, 48000]
+    thorsten_v2:
+      latest:
+        example: 'Fischers Fritze fischt frische Fische, Frische Fische fischt Fischers Fritze.'
+        package: 'https://models.silero.ai/models/tts/de/v2_thorsten.pt'
+        sample_rate: [8000, 16000]
+    thorsten_8khz:
+      latest:
+        tokenset: '_~abcdefghijklmnopqrstuvwxyzäöüß .,!?…:;–'
+        example: 'Fischers Fritze fischt frische Fische, Frische Fische fischt Fischers Fritze.'
+        jit: 'https://models.silero.ai/models/tts/de/v1_thorsten_8000.jit'
+        sample_rate: 8000
+      v1:
+        tokenset: '_~abcdefghijklmnopqrstuvwxyzäöüß .,!?…:;–'
+        example: 'Fischers Fritze fischt frische Fische, Frische Fische fischt Fischers Fritze.'
+        jit: 'https://models.silero.ai/models/tts/de/v1_thorsten_8000.jit'
+        sample_rate: 8000
+    thorsten_16khz:
+      latest:
+        tokenset: '_~abcdefghijklmnopqrstuvwxyzäöüß .,!?…:;–'
+        example: 'Fischers Fritze fischt frische Fische, Frische Fische fischt Fischers Fritze.'
+        jit: 'https://models.silero.ai/models/tts/de/v1_thorsten_16000.jit'
+        sample_rate: 16000
+      v1:
+        tokenset: '_~abcdefghijklmnopqrstuvwxyzäöüß .,!?…:;–'
+        example: 'Fischers Fritze fischt frische Fische, Frische Fische fischt Fischers Fritze.'
+        jit: 'https://models.silero.ai/models/tts/de/v1_thorsten_16000.jit'
+        sample_rate: 16000
+  es:
+    v3_es:
+      latest:
+        example: 'Hoy ya es ayer y ayer ya es hoy, ya llegó el día, y hoy es hoy.'
+        package: 'https://models.silero.ai/models/tts/es/v3_es.pt'
+        sample_rate: [8000, 24000, 48000]
+    tux_v2:
+      latest:
+        example: 'Hoy ya es ayer y ayer ya es hoy, ya llegó el día, y hoy es hoy.'
+        package: 'https://models.silero.ai/models/tts/es/v2_tux.pt'
+        sample_rate: [8000, 16000]
+    tux_8khz:
+      latest:
+        tokenset: '_~abcdefghijklmnopqrstuvwxyzáéíñóú .,!?…:;–¡¿'
+        example: 'Hoy ya es ayer y ayer ya es hoy, ya llegó el día, y hoy es hoy.'
+        jit: 'https://models.silero.ai/models/tts/es/v1_tux_8000.jit'
+        sample_rate: 8000
+      v1:
+        tokenset: '_~abcdefghijklmnopqrstuvwxyzáéíñóú .,!?…:;–¡¿'
+        example: 'Hoy ya es ayer y ayer ya es hoy, ya llegó el día, y hoy es hoy.'
+        jit: 'https://models.silero.ai/models/tts/es/v1_tux_8000.jit'
+        sample_rate: 8000
+    tux_16khz:
+      latest:
+        tokenset: '_~abcdefghijklmnopqrstuvwxyzáéíñóú .,!?…:;–¡¿'
+        example: 'Hoy ya es ayer y ayer ya es hoy, ya llegó el día, y hoy es hoy.'
+        jit: 'https://models.silero.ai/models/tts/es/v1_tux_16000.jit'
+        sample_rate: 16000
+      v1:
+        tokenset: '_~abcdefghijklmnopqrstuvwxyzáéíñóú .,!?…:;–¡¿'
+        example: 'Hoy ya es ayer y ayer ya es hoy, ya llegó el día, y hoy es hoy.'
+        jit: 'https://models.silero.ai/models/tts/es/v1_tux_16000.jit'
+        sample_rate: 16000
+  fr:
+    v3_fr:
+      latest:
+        example: 'Je suis ce que je suis, et si je suis ce que je suis, qu’est ce que je suis.'
+        package: 'https://models.silero.ai/models/tts/fr/v3_fr.pt'
+        sample_rate: [8000, 24000, 48000]
+    gilles_v2:
+      latest:
+        example: 'Je suis ce que je suis, et si je suis ce que je suis, qu’est ce que je suis.'
+        package: 'https://models.silero.ai/models/tts/fr/v2_gilles.pt'
+        sample_rate: [8000, 16000]
+    gilles_8khz:
+      latest:
+        tokenset: '_~abcdefghijklmnopqrstuvwxyzéàèùâêîôûç .,!?…:;–'
+        example: 'Je suis ce que je suis, et si je suis ce que je suis, qu’est ce que je suis.'
+        jit: 'https://models.silero.ai/models/tts/fr/v1_gilles_8000.jit'
+        sample_rate: 8000
+      v1:
+        tokenset: '_~abcdefghijklmnopqrstuvwxyzéàèùâêîôûç .,!?…:;–'
+        example: 'Je suis ce que je suis, et si je suis ce que je suis, qu’est ce que je suis.'
+        jit: 'https://models.silero.ai/models/tts/fr/v1_gilles_8000.jit'
+        sample_rate: 8000
+    gilles_16khz:
+      latest:
+        tokenset: '_~abcdefghijklmnopqrstuvwxyzéàèùâêîôûç .,!?…:;–'
+        example: 'Je suis ce que je suis, et si je suis ce que je suis, qu’est ce que je suis.'
+        jit: 'https://models.silero.ai/models/tts/fr/v1_gilles_16000.jit'
+        sample_rate: 16000
+      v1:
+        tokenset: '_~abcdefghijklmnopqrstuvwxyzéàèùâêîôûç .,!?…:;–'
+        example: 'Je suis ce que je suis, et si je suis ce que je suis, qu’est ce que je suis.'
+        jit: 'https://models.silero.ai/models/tts/fr/v1_gilles_16000.jit'
+        sample_rate: 16000
+  ba:
+    aigul_v2:
+      latest:
+        example: 'Салауат Юлаевтың тормошо һәм яҙмышы хаҡындағы документтарҙың һәм шиғри әҫәрҙәренең бик аҙ өлөшө генә һаҡланған.'
+        package: 'https://models.silero.ai/models/tts/ba/v2_aigul.pt'
+        sample_rate: [8000, 16000]
+        language_name: 'bashkir'
+  xal:
+    v3_xal:
+      latest:
+        example: 'Һорвн, дөрвн күн ирәд, һазань чиңгнв. Байн Цецн хаана һорвн көвүн күүндҗәнә.'
+        package: 'https://models.silero.ai/models/tts/xal/v3_xal.pt'
+        sample_rate: [8000, 24000, 48000]
+    erdni_v2:
+      latest:
+        example: 'Һорвн, дөрвн күн ирәд, һазань чиңгнв. Байн Цецн хаана һорвн көвүн күүндҗәнә.'
+        package: 'https://models.silero.ai/models/tts/xal/v2_erdni.pt'
+        sample_rate: [8000, 16000]
+        language_name: 'kalmyk'
+  tt:
+    v3_tt:
+      latest:
+        example: 'Исәнмесез, саумысез, нишләп кәҗәгезне саумыйсыз, әтәчегез күкәй салган, нишләп чыгып алмыйсыз.'
+        package: 'https://models.silero.ai/models/tts/tt/v3_tt.pt'
+        sample_rate: [8000, 24000, 48000]
+    dilyara_v2:
+      latest:
+        example: 'Ис+әнмесез, с+аумысез, нишл+әп кәҗәгезн+е с+аумыйсыз, әтәчег+ез күк+әй салг+ан, нишл+әп чыг+ып +алмыйсыз.'
+        package: 'https://models.silero.ai/models/tts/tt/v2_dilyara.pt'
+        sample_rate: [8000, 16000]
+        language_name: 'tatar'
+  uz:
+    v4_uz:
+      latest:
+        example: 'Tanishganimdan xursandman.'
+        package: 'https://models.silero.ai/models/tts/uz/v4_uz.pt'
+        sample_rate: [8000, 24000, 48000]
+    v3_uz:
+      latest:
+        example: 'Tanishganimdan xursandman.'
+        package: 'https://models.silero.ai/models/tts/uz/v3_uz.pt'
+        sample_rate: [8000, 24000, 48000]
+    dilnavoz_v2:
+      latest:
+        example: 'Tanishganimdan xursandman.'
+        package: 'https://models.silero.ai/models/tts/uz/v2_dilnavoz.pt'
+        sample_rate: [8000, 16000]
+        language_name: 'uzbek'
+  ua:
+    v4_ua:
+      latest:
+        example: 'К+отики - пухн+асті жив+отики.'
+        package: 'https://models.silero.ai/models/tts/ua/v4_ua.pt'
+        sample_rate: [8000, 24000, 48000]
+    v3_ua:
+      latest:
+        example: 'К+отики - пухн+асті жив+отики.'
+        package: 'https://models.silero.ai/models/tts/ua/v3_ua.pt'
+        sample_rate: [8000, 24000, 48000]
+    mykyta_v2:
+      latest:
+        example: 'К+отики - пухн+асті жив+отики.'
+        package: 'https://models.silero.ai/models/tts/ua/v22_mykyta_48k.pt'
+        sample_rate: [8000, 24000, 48000]
+        language_name: 'ukrainian'
+  indic:
+    v4_indic:
+      latest:
+        example: 'prasidda kabīra adhyētā, puruṣōttama agravāla kā yaha śōdha ālēkha, usa rāmānaṁda kī khōja karatā hai'
+        package: 'https://models.silero.ai/models/tts/indic/v4_indic.pt'
+        sample_rate: [8000, 24000, 48000]
+    v3_indic:
+      latest:
+        example: 'prasidda kabīra adhyētā, puruṣōttama agravāla kā yaha śōdha ālēkha, usa rāmānaṁda kī khōja karatā hai'
+        package: 'https://models.silero.ai/models/tts/indic/v3_indic.pt'
+        sample_rate: [8000, 24000, 48000]
+  cyrillic:
+    v4_cyrillic:
+      latest:
+        example: 'Волк слабее льва и тигра, но в цирке он не выступает.'
+        package: 'https://models.silero.ai/models/tts/cyr/v4_cyrillic.pt'
+        sample_rate: [8000, 24000, 48000]
+  multi:
+    multi_v2:
+      latest:
+        package: 'https://models.silero.ai/models/tts/multi/v2_multi.pt'
+        sample_rate: [8000, 16000]
+        speakers:
+          aidar:
+            lang: 'ru'
+            example: 'Съ+ешьте ещ+ё +этих м+ягких франц+узских б+улочек, д+а в+ыпейте ч+аю.'
+          baya:
+            lang: 'ru'
+            example: 'Съ+ешьте ещ+ё +этих м+ягких франц+узских б+улочек, д+а в+ыпейте ч+аю.'
+          kseniya:
+            lang: 'ru'
+            example: 'Съ+ешьте ещ+ё +этих м+ягких франц+узских б+улочек, д+а в+ыпейте ч+аю.'
+          irina:
+            lang: 'ru'
+            example: 'Съ+ешьте ещ+ё +этих м+ягких франц+узских б+улочек, д+а в+ыпейте ч+аю.'
+          ruslan:
+            lang: 'ru'
+            example: 'Съ+ешьте ещ+ё +этих м+ягких франц+узских б+улочек, д+а в+ыпейте ч+аю.'
+          natasha:
+            lang: 'ru'
+            example: 'Съ+ешьте ещ+ё +этих м+ягких франц+узских б+улочек, д+а в+ыпейте ч+аю.'
+          thorsten:
+            lang: 'de'
+            example: 'Fischers Fritze fischt frische Fische, Frische Fische fischt Fischers Fritze.'
+          tux:
+            lang: 'es'
+            example: 'Hoy ya es ayer y ayer ya es hoy, ya llegó el día, y hoy es hoy.'
+          gilles:
+            lang: 'fr'
+            example: 'Je suis ce que je suis, et si je suis ce que je suis, qu’est ce que je suis.'
+          lj:
+            lang: 'en'
+            example: 'Can you can a canned can into an un-canned can like a canner can can a canned can into an un-canned can?'
+          dilyara:
+            lang: 'tt'
+            example: 'Пес+и пес+и песик+әй, борыннар+ы бәләк+әй.'
+te_models:
+  latest:
+    package: "https://models.silero.ai/te_models/v2_4lang_q.pt"
+    languages: ['en', 'de', 'ru', 'es']
+    punct: '.,-!?—'
+  v2:
+    package: "https://models.silero.ai/te_models/v2_4lang_q.pt"
+    languages: ['en', 'de', 'ru', 'es']
+    punct: '.,-!?—'
+denoise_models:
+  models: ['small_slow', 'large_fast', 'small_fast']
+  samples: [
+    "https://models.silero.ai/denoise_models/sample0.wav",
+    "https://models.silero.ai/denoise_models/sample1.wav",
+  ]
+  small_slow:
+    latest:
+      jit: "https://models.silero.ai/denoise_models/sns_latest.jit"
+    v0:
+      jit: "https://models.silero.ai/denoise_models/sns_v0.jit"
+  large_fast:
+    latest:
+      jit: "https://models.silero.ai/denoise_models/lnf_latest.jit"
+    v0:
+      jit: "https://models.silero.ai/denoise_models/lnf_v0.jit"
+  small_fast:
+    latest:
+      jit: "https://models.silero.ai/denoise_models/snf_latest.jit"
+    v0:
+      jit: "https://models.silero.ai/denoise_models/snf_v0.jit"
+import time
+from fastapi import FastAPI, UploadFile, Request
+import secrets
+from hashlib import sha256
+import os
+from split_entry import agnostic_to_platform_splitter
+
+UPLOAD_DIR = "UPLOADS/"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+allowed_extensions = (".mp4", ".mkv")
+
+app = FastAPI()
+
+@app.post("/split-vid")
+async def split_vid(file: UploadFile, padding: int, request: Request):
+
+    client_ip = request.client
+    if client_ip == None:
+        return {"message", "how do you not have an ip??"}
+
+    if file.filename == None:
+        return {"message", "could not upload file with no name"}
+
+    if not file.filename.endswith(allowed_extensions):
+        return {"message": "unsupported file type"}
+
+    random_secret = str(secrets.randbits(64))
+
+    hash_data = client_ip.host + str(time.time()) + file.filename + random_secret
+
+    hash = sha256(hash_data.encode("utf-8")).hexdigest()
+
+    new_file_name = str(hash) + "." + file.filename.rsplit(".", 1)[-1]
+
+    contents = await file.read()
+
+    with open(os.path.join(UPLOAD_DIR, new_file_name), "wb") as f:
+        f.write(contents)
+
+    return {"message": agnostic_to_platform_splitter(UPLOAD_DIR + new_file_name, padding)}
+
+
+import ffmpeg
+
+TEMP_MARKING: str = "tmp-"
+#     audio_path = video_file.split(".")[0] + ".wav"
+
+
+def extract_audio_from_vid(video_file: str, audio_path: str):
+    try:
+        stream = ffmpeg.input(video_file)
+        stream = ffmpeg.output(stream, audio_path, format='wav', acodec='pcm_s16le', ar=16000)
+        ffmpeg.run(stream)
+        print(f"Audio extracted to {audio_path}")
+    except ffmpeg.Error as e:
+        print(f"Error extracting audio: {e.stderr.decode()}")
+        raise
+import numpy as np
+
+class Segment:
+    video_len = 0
+    padding = 0 # changed in main if padding arg is passed by user
+    text = ""
+
+    def __init__(self, start: np.float64,  end: np.float64, vid_end: np.float64, text: str):
+        start = np.round(start).astype(int)
+        self.video_len = vid_end;
+        self.text = text
+        self.start = start if start - self.padding >= 0 else np.float64(0)
+        self.end = np.round(end).astype(int) + self.padding # might needa check upper bound
+import ffmpeg
+
+def split_and_write_vid(vid_path: str, start: str, stop: str, tag: int) -> str:
+    s = vid_path.rsplit('.', 1) # split once near the end
+    outfile = "Videos/" + s[-2] + f"_EDIT_{tag}." + s[-1] 
+
+    print(f"attempting to split into outfile: {outfile}")
+
+    try:
+        ffmpeg.input(vid_path, ss=start, to=stop).output(outfile).run()
+        return outfile
+    except Exception as e:
+        print(f"what {e}")
+        return ""
+
+# split_and_write_vid("tcp_short.mp4", "00:00:00", "00:00:50", 0)
+import pre
+import audio
+import argparse
+import context
+import slicey
+
+def agnostic_to_platform_splitter(video: str, padding: int):
+
+        if video == "":
+            raise Exception("video name invalid")
+
+        audio_path=f"{video}_tmp_.wav"
+
+        pre.extract_audio_from_vid(video, audio_path)
+        segments = audio.transcribe_audio(audio_path, padding)
+
+        if segments == None:
+            raise ValueError("no audio segments found in video!")
+
+        makes_sense = context.process_segments(segments)
+
+        print(f"this is makes sense: {makes_sense}")
+
+        ret: list[str] = []
+
+        tag = 0
+        for seg in makes_sense:
+            print(seg.start, seg.end)
+            start = str(seg.start)
+            end = str(seg.end)
+            split_file = slicey.split_and_write_vid(video, start, end, tag)
+            ret.append(split_file)
+            tag += 1
+
+        return ret
+
+
+
+def split_entry():
+
+    parser = argparse.ArgumentParser("")
+    parser.add_argument("-v", "--video", type=str, help="please enter a valid video path e.g. ./vid.mp4")
+    parser.add_argument("-p", "--padding", type=int, default=1, help="enter padding in seconds between clips")
+
+    args = parser.parse_args()
+
+    try:
+        agnostic_to_platform_splitter(args.video, args.padding)
+
+    except Exception as e:
+        print("exception parsing args was:", e, "\nplease enter command in the form `python3 ./main.py --video media.mp4 --padding 1`")
+
+
+
+if __name__ == "__main__":
+    split_entry()
