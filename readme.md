@@ -1,5 +1,7 @@
 # KeepItRolling
 
+<img width="1475" height="1105" alt="system_design_diagram" src="https://github.com/user-attachments/assets/7aa595d3-3948-4607-917b-909416c272e8" />
+
 The aim is to keep the camera rolling without having to manage so many recordings and sift through relevant ones manually.
 
 KeepItRolling is a project that processes video and audio files, detects speech segments, checks coherence, and generates summaries and tags for those segments using local ML models.
