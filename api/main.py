@@ -1,5 +1,7 @@
 import time
-from fastapi import FastAPI, UploadFile, Request
+from fastapi import FastAPI, Form, UploadFile, Request
+from fastapi.middleware.cors import CORSMiddleware
+
 import secrets
 from hashlib import sha256
 import os
@@ -12,8 +14,15 @@ allowed_extensions = (".mp4", ".mkv")
 
 app = FastAPI()
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 @app.post("/split-vid")
-async def split_vid(file: UploadFile, padding: int, request: Request):
+async def split_vid(request: Request, file: UploadFile, padding: int = Form(...)):
 
     client_ip = request.client
     if client_ip == None:
@@ -41,3 +50,7 @@ async def split_vid(file: UploadFile, padding: int, request: Request):
     return {"message": agnostic_to_platform_splitter(UPLOAD_DIR + new_file_name, padding)}
 
 
+@app.get("get-vid")
+async def get_vid(file_name: str):
+    if file_name == "":
+        return {"

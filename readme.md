@@ -17,16 +17,7 @@ The **core model logic is implemented and working**, while the **FastAPI service
 - Tags / labels each segment with short descriptions.  
 - Uses OpenAI Whisper for speech extraction, Silero-models for repunctuation before feeding into coherence check.
 - Designed to be exposed as an API with **FastAPI** (in progress).
-
----
-
-## Current Status
-
-✅ Core model logic (speech detection, coherence checks, tagging)
-
-🚧 FastAPI service layer (endpoints, request/response handling)  
-
-You can already run the logic modules directly, but the REST API is still being integrated.
+- Planned - Timed deletions of videos in the ./api/OUTPUTS/ directory. (get the file creation date, and compare to current, and if after certain threshold, delete)
 
 ---
 
@@ -65,4 +56,4 @@ fastapi dev main.py
 
 ```
 
-You can now upload at 127.0.0.1:800/docs
+You can now upload at 127.0.0.1:8000/docs
