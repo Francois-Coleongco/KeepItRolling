@@ -2,9 +2,10 @@
 
 <img width="1475" height="1105" alt="system_design_diagram" src="https://github.com/user-attachments/assets/7aa595d3-3948-4607-917b-909416c272e8" />
 
-API Demo:
+Demo:
 
-https://github.com/user-attachments/assets/1ed39698-aadb-4c8f-97d0-9501712ad109
+https://github.com/user-attachments/assets/74f3d2bf-55b9-469a-a470-5504b69ebbae
+
 
 
 The aim is to keep the camera rolling without having to manage so many recordings and sift through relevant ones manually.
