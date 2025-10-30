@@ -21,8 +21,9 @@ The **core model logic is implemented and working**, while the **FastAPI service
 - Checks coherence of speech segments using a local LLM (Ollama).  
 - Tags / labels each segment with short descriptions.  
 - Uses OpenAI Whisper for speech extraction, Silero-models for repunctuation before feeding into coherence check.
-- Designed to be exposed as an API with **FastAPI** (in progress).
-- Planned - Timed deletions of videos in the ./api/OUTPUTS/ directory. (get the file creation date, and compare to current, and if after certain threshold, delete)
+- Exposed as an API with **FastAPI** and **React** interface.
+
+- Planned - Timed deletions of videos in the ./api/OUTPUTS/ directory. (get the file creation date, and compare to current, and if after certain threshold, delete), perhaps do this as a cron job?
 
 
 ## FastAPI
@@ -47,17 +48,25 @@ Process a video or audio file.
 
 ## Usage
 
-Right now, you can use the API through SwaggerUI, React frontend is in progress.
-
+in terminal 1:
 ```
-
 python3 -m venv venv
 source ./venv/bin/activate
 pip3 install -r requirements.txt
 cd api/
 
 fastapi dev main.py
-
 ```
 
-You can now upload at 127.0.0.1:8000/docs
+in terminal 2:
+```
+cd frontend/
+npm run dev
+```
+
+Now you can visit `http://localhost:5173/`
+
+
+## Deployment
+
+Coming soon :)
