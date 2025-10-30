@@ -1,13 +1,11 @@
 import numpy as np
 from segment import Segment
 import ollama
-import torch
-import torch
 from silero import silero_te
 
 def repunctuate(dat: str):
     dat = dat.lower()
-    model, examples, langs, supported_punct, apply_te = silero_te()
+    model, _, _, _, apply_te = silero_te()
     punctuated_text = apply_te(dat, model)
     return punctuated_text
 
@@ -30,6 +28,7 @@ def ollama_passthrough(dat: str):
     - Technical jargon, even if used incorrectly.
     - Strange or illogical statements that a human might still say.
     - Repetitive or boring statements.
+    - Be VERY lenient.
 
     If a reasonable human could utter the text in any context, return "true".
     Text: "{dat}"

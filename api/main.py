@@ -8,12 +8,10 @@ import os
 
 from fastapi.responses import FileResponse
 from split_entry import agnostic_to_platform_splitter
+import common
 
-UPLOAD_DIR = "UPLOADS/"
-OUTPUT_DIR = "OUTPUTS/"
-
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-os.makedirs(OUTPUT_DIR, exist_ok=True)
+os.makedirs(common.UPLOAD_DIR, exist_ok=True)
+os.makedirs(common.OUTPUT_DIR, exist_ok=True)
 
 allowed_extensions = (".mp4", ".mkv")
 
@@ -50,13 +48,13 @@ async def split_vid(request: Request, file: UploadFile, padding: int = Form(...)
 
     contents = await file.read()
 
-    with open(os.path.join(UPLOAD_DIR, new_file_name), "wb") as f:
+    with open(os.path.join(common.UPLOAD_DIR, new_file_name), "wb") as f:
         f.write(contents)
 
-    return {"message": agnostic_to_platform_splitter(UPLOAD_DIR + new_file_name, padding)}
+    return {"message": agnostic_to_platform_splitter(common.UPLOAD_DIR + new_file_name, padding)}
 
 
-@app.get("get-vid")
+@app.get("/get-vid")
 async def get_vid(file_name: str):
     if file_name == "":
         raise HTTPException(
@@ -65,7 +63,7 @@ async def get_vid(file_name: str):
         )
 
     try:
-        file_path = os.path.join(OUTPUT_DIR, file_name)
+        file_path = os.path.join(common.OUTPUT_DIR, file_name)
         return FileResponse(
             path=file_path,
             filename=file_name,
