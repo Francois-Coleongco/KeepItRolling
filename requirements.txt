@@ -4,3 +4,9 @@ ollama
 silero
 ffmpeg-python
 fastapi[standard]
+python-dotenv
+PyJWT
+sqlalchemy
+asyncpg
+psycopg2-binary
+pwdlib[argon2]

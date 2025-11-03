@@ -4,3 +4,5 @@ __pycache__
 *wav
 mediafiles
 api/UPLOADS/*
+api/OUTPUTS/*
+api/.env
