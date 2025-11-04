@@ -10,8 +10,7 @@ from fastapi.responses import FileResponse
 from split_entry import agnostic_to_platform_splitter
 
 from common import UPLOAD_DIR, OUTPUT_DIR, UserInDB
-from db import SessionLocal, User
-from auth import hash_password, get_current_user, authenticate_user, create_access_token
+from auth import get_current_user, authenticate_user, create_access_token
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
@@ -20,15 +19,7 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 allowed_extensions = (".mp4", ".mkv")
 
-db = SessionLocal()
-if not db.query(User).filter(User.username=="alice").first():
-    user = User(username="alice", hashed_password=hash_password("password123"))
-    db.add(user)
-    db.commit()
-db.close()
-
 app = FastAPI()
-
 
 app.add_middleware(
     CORSMiddleware,
@@ -39,17 +30,17 @@ app.add_middleware(
 
 
 @app.post("/split-vid")
-async def split_vid(request: Request, file: UploadFile, padding: int = Form(...), current_user: UserInDB = Depends(get_current_user),):
+async def split_vid(request: Request, file: UploadFile, padding: int = Form(...), current_user: UserInDB = Depends(get_current_user)):
 
     client_ip = request.client
     if client_ip == None:
-        return {"message": "how do you not have an ip??"}
+        return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="how do you not have an ip??")
 
     if file.filename == None:
-        return {"message": "could not upload file with no name"}
+        return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="no file name provided")
 
     if not file.filename.endswith(allowed_extensions):
-        return {"message": "unsupported file type"}
+        return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid file extension")
 
     random_secret = str(secrets.randbits(64))
 

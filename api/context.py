@@ -39,7 +39,7 @@ def ollama_passthrough(dat: str):
     return "true" in resp['response'].lower()
 
 
-def process_segments(segments: list[Segment]) -> list[Segment]:
+def process_segments(segments: list[Segment], threshold: np.float64) -> list[Segment]:
     length = len(segments)
     # should change the return type to list perhaps if not doing the splitting logic in here
 
@@ -47,8 +47,6 @@ def process_segments(segments: list[Segment]) -> list[Segment]:
 
     # get the contiguous (by threshold) segments and group them into a new list that is ret
     # use a sliding window
-
-    threshold = np.float64(2) # should be something user defined in a config and/or part of flags
 
     i = 0
 

@@ -3,6 +3,7 @@ import audio
 import argparse
 import context
 import slicey
+import numpy as np
 
 def agnostic_to_platform_splitter(video: str, padding: int):
 
@@ -17,7 +18,7 @@ def agnostic_to_platform_splitter(video: str, padding: int):
         if segments == None:
             raise ValueError("no audio segments found in video!")
 
-        makes_sense = context.process_segments(segments)
+        makes_sense = context.process_segments(segments, np.float64(padding))
 
         print(f"this is makes sense: {makes_sense}")
 
