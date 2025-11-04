@@ -1,16 +1,22 @@
 import Dashboard from './views/dashboard'
 import Login from './views/login';
-import { useState } from 'react';
+import { BrowserRouter, Route, Routes } from 'react-router-dom';
 
 
 function App() {
-	const [token, setToken] = useState<string | null>(null);
-
-	return token ? (
-		<Dashboard token={token} />
-	) : (
-		<Login onLogin={setToken} />
+	return (
+		<Routes>
+			<Route
+				path="/login"
+				element={<Login />}
+			/>
+			<Route
+				path="/dashboard"
+				element={<Dashboard />}
+			/>
+		</Routes>
 	);
+
 }
 
 export default App;

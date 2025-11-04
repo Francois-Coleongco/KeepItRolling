@@ -1,10 +1,8 @@
 import { useState, type FormEvent, type ChangeEvent } from "react";
+import { useNavigate } from "react-router-dom";
 
-interface LoginProps {
-	onLogin: (token: string) => void;
-}
-
-const Login = ({ onLogin }: LoginProps) => {
+const Login = () => {
+	const navigate = useNavigate()
 	const [username, setUsername] = useState<string>("");
 	const [password, setPassword] = useState<string>("");
 	const [loading, setLoading] = useState<boolean>(false);
@@ -23,6 +21,7 @@ const Login = ({ onLogin }: LoginProps) => {
 				method: "POST",
 				headers: { "Content-Type": "application/x-www-form-urlencoded" },
 				body: formData.toString(),
+				credentials: "include"
 			});
 
 			if (!res.ok) {
@@ -30,7 +29,10 @@ const Login = ({ onLogin }: LoginProps) => {
 			}
 
 			const data = await res.json();
-			onLogin(data.access_token);
+			console.log(data)
+			if (data.authed === true) {
+				navigate("/dashboard")
+			}
 		} catch (err: any) {
 			setError(err.message || "Login failed");
 		} finally {

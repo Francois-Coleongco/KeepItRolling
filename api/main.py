@@ -1,7 +1,6 @@
 from datetime import datetime
-from fastapi import Depends, FastAPI, Form, UploadFile, Request, HTTPException, status
+from fastapi import Depends, FastAPI, Form, UploadFile, Request, HTTPException, status, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 import secrets
 from hashlib import sha256
 import os
@@ -12,8 +11,6 @@ from split_entry import agnostic_to_platform_splitter
 from common import UPLOAD_DIR, OUTPUT_DIR, UserInDB
 from auth import get_current_user, authenticate_user, create_access_token
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
@@ -23,7 +20,8 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://127.0.0.1:5173"],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -80,9 +78,17 @@ async def get_vid(file_name: str, UserInDB = Depends(get_current_user)):
 
 
 @app.post("/token")
-def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    user = authenticate_user(form_data.username, form_data.password)
+def login(response: Response, username: str = Form(...), password: str = Form(...)):
+    user = authenticate_user(username, password)
     if not user:
         raise HTTPException(status_code=401, detail="Incorrect username or password")
-    token = create_access_token(user.username)
-    return {"access_token": token, "token_type": "bearer"}
+    token = create_access_token(username)
+    response.set_cookie(
+                key="access_token",
+                value=token,
+                httponly=True,
+                samesite="lax",
+                secure=False,
+                max_age=3600
+            )
+    return {"authed": True}

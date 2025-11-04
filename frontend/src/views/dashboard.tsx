@@ -1,16 +1,15 @@
-import { useState, type ChangeEvent, type FormEvent } from 'react';
+import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
 
-interface DashboardProps {
-	token: string;
-}
-
-const Dashboard = ({ token }: DashboardProps) => {
+const Dashboard = () => {
 	type messageObject = {
 		message: string[];
 	};
 
 	const [selectedFile, setSelectedFile] = useState<File | null>(null);
 	const [mySplitFiles, setMySplitFiles] = useState<string[] | null>(null);
+
+	const [myVideoBlobs, setVideoBlobs] = useState<Record<string, string>>({});
+
 	const [padding, setPadding] = useState<number>(0);
 	const [loading, setLoading] = useState<boolean>(false);
 
@@ -36,32 +35,57 @@ const Dashboard = ({ token }: DashboardProps) => {
 		try {
 			const res = await fetch('http://127.0.0.1:8000/split-vid', {
 				method: 'POST',
-				headers: {
-					'Authorization': `Bearer ${token}`
-				},
 				body: formData,
+				credentials: 'include',
 			});
 
 			const data: messageObject = await res.json();
+
 			setMySplitFiles(data.message);
 		} finally {
 			setLoading(false);
 		}
 	};
 
-	const downloadVideo = async (file_name: string) => {
+	const loadVideos = async (file_name: string) => {
 		const url = `http://127.0.0.1:8000/get-vid?file_name=${encodeURIComponent(file_name)}`;
-		const res = await fetch(url);
+		const res = await fetch(
+			url, {
+			method: 'GET',
+			credentials: 'include',
+		}
+		);
 		const blob = await res.blob();
 		const blob_url = URL.createObjectURL(blob);
+
+		setVideoBlobs((prev: Record<string, string>) => ({
+			...prev,
+			[file_name]: blob_url,
+		}));
+	};
+
+	const downloadVideo = async (filename: string) => {
 		const link = document.createElement('a');
-		link.href = blob_url;
-		link.download = file_name;
+		link.href = myVideoBlobs[filename];
+		link.download = filename;
 		document.body.appendChild(link);
 		link.click();
-		document.body.removeChild(link);
-		URL.revokeObjectURL(blob_url);
-	};
+		document.body.removeChild(link); URL.revokeObjectURL(myVideoBlobs[filename]);
+
+	}
+
+	useEffect(() => {
+		mySplitFiles?.forEach((file: string) => {
+			loadVideos(file);
+		})
+	}, [mySplitFiles])
+
+	useEffect(() => {
+		return () => {
+			Object.values(myVideoBlobs).forEach((url) => URL.revokeObjectURL(url));
+		};
+	}, []);
+
 
 	return (
 		<div className="min-h-screen bg-gray-900 text-gray-200 font-sans p-4">
@@ -110,7 +134,7 @@ const Dashboard = ({ token }: DashboardProps) => {
 						<video
 							controls
 							className="w-full sm:w-48 rounded border border-gray-600"
-							src={`http://127.0.0.1:8000/get-vid?file_name=${encodeURIComponent(val)}`}
+							src={myVideoBlobs[val]}
 						/>
 						<div className="flex items-center gap-2 w-full justify-between">
 							<button

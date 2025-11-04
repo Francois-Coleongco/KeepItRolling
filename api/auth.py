@@ -1,6 +1,5 @@
 from datetime import datetime, timedelta, timezone
-from fastapi import Depends, HTTPException
-from fastapi.security import OAuth2PasswordBearer
+from fastapi import Depends, HTTPException, Cookie
 import jwt
 import os
 from dotenv import load_dotenv
@@ -19,8 +18,6 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
 pwd_context = PasswordHash.recommended()
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 def verify_password(password, hashed):
     return pwd_context.verify(password, hashed)
@@ -53,9 +50,19 @@ def authenticate_user(username: str, password: str):
         return None
     return user
 
-def get_current_user(token: str = Depends(oauth2_scheme)):
-    username = decode_access_token(token)
+def get_current_user(access_token: str = Cookie(None)):
+    print("Access token from cookie:", access_token)
+
+    if access_token is None:
+        raise HTTPException(status_code=401, detail="No access token provided")
+
+    username = decode_access_token(access_token)
     user = get_user(username)
+
+    print("Decoded username:", username)
+    print("User object:", user)
+
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
+    
     return user
