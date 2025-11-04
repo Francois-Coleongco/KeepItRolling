@@ -30,42 +30,48 @@ The **core model logic is implemented and working**, while the **FastAPI service
 ## FastAPI
 
 ### POST /split-vid
-Process a video or audio file.
+Process a video file.
 
 **Expected request:**
 - Multipart/form-data with video file upload.
-- Optional query parameters for configuration.
+- Padding - (integer value for how many seconds you want between output clips).
 
 **Expected response:**
-- JSON containing:
-  - Segment timestamps
-  - Transcriptions  
 
-  **Planned:**
-  - Coherence check results
-  - Tags/labels
+- a list of file names of split videos
+
+
+### GET /get-vid
+Retrieve a video file.
+
+**Expected request:**
+- Query parameter containing the video name one wishes to download.
+
+**Expected response:**
+
+- the video file as a downloadable blob
+
 
 ---
 
 ## Usage
 
-in terminal 1:
+In terminal 1:
 ```
 python3 -m venv venv
 source ./venv/bin/activate
 pip3 install -r requirements.txt
 cd api/
-
 fastapi dev main.py
 ```
 
-in terminal 2:
+In terminal 2:
 ```
 cd frontend/
 npm run dev
 ```
 
-Now you can visit `http://localhost:5173/`
+Now you can visit `http://127.0.0.1:5173/`
 
 
 ## Deployment
