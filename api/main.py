@@ -59,7 +59,7 @@ async def split_vid(request: Request, file: UploadFile, padding: int = Form(...)
 
 
 @app.get("/get-vid")
-async def get_vid(file_name: str):
+async def get_vid(file_name: str, UserInDB = Depends(get_current_user)):
     if file_name == "":
         raise HTTPException(
             status_code=status.HTTP_406_NOT_ACCEPTABLE,
